@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Sistema Inventário - Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&family=Orbitron:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="menu">
+    <h2>Inventário</h2>
+    <a href="index.html">Dashboard</a>
+    <a href="inventario.html">Inventário</a>
+    <a href="historico.html">Histórico</a>
+    <hr>
+    <a href="cadastro.html">Cadastro de Usuário</a>
+    <a href="usuarios.html">Usuários cadastrados</a>
+  </div>
+  <div class="user-info">
+    <p id="usuarioLogado">Usuário: </p>
+    <button>Sair</button>
+  </div>
+</div>
+
+<div class="content">
+  <h1>Dashboard</h1>
+  <!-- Cards resumo -->
+  <div class="dashboard">
+    <div class="card"><h3>Total Ativos</h3><div id="totalAtivos">0</div></div>
+    <div class="card"><h3>Total Estoque</h3><div id="totalEstoque">0</div></div>
+    <div class="card"><h3>Total Manutenção</h3><div id="totalManutencao">0</div></div>
+  </div>
+  <!-- Gráficos -->
+  <div class="dashboard-charts">
+    <div class="chart"><canvas id="graficoStatus"></canvas></div>
+    <div class="chart"><canvas id="graficoUnidade"></canvas></div>
+    <div class="chart"><canvas id="graficoSetor"></canvas></div>
+    <div class="chart"><canvas id="graficoTempoManutencao"></canvas></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+
+<!-- Carregue primeiro o auth.js -->
+<script src="auth.js"></script>
+
+<script>
+function formatarNumero(valor){
+  if(valor >= 1000000) return (valor/1000000).toFixed(1)+"M";
+  if(valor >= 1000) return (valor/1000).toFixed(1)+"k";
+  return valor;
+}
+
+async function carregarDashboard(){
+  try {
+    // 👇 ADICIONE ESTAS DUAS LINHAS AQUI 👇
+    const token = localStorage.getItem("token");
+    axios.defaults.headers.common["Authorization"] = "Bearer " + token;
+
+    // Agora sim o pedido vai com o token garantido!
+    const res = await axios.get("/patrimonios?limit=10000");
+    const itens = res.data.data || [];
+
+    let ativos = 0, estoque = 0, manutencao = 0;
+    let unidadeCount = {}, setorCount = {};
+
+    itens.forEach(item=>{
+      if(item.status === "ATIVO") ativos++;
+      if(item.status === "ESTOQUE") estoque++;
+      if(item.status === "MANUTENCAO") manutencao++;
+      unidadeCount[item.unidade] = (unidadeCount[item.unidade] || 0) + 1;
+      setorCount[item.setor] = (setorCount[item.setor] || 0) + 1;
+    });
+
+    document.getElementById("totalAtivos").innerText = ativos;
+    document.getElementById("totalEstoque").innerText = estoque;
+    document.getElementById("totalManutencao").innerText = manutencao;
+
+    // Gráficos principais
+    new Chart(document.getElementById("graficoStatus"), {
+      type:"pie",
+      data:{ 
+        labels:["Ativos","Estoque","Manutenção"], 
+        datasets:[{ data:[ativos,estoque,manutencao], backgroundColor:["#22c55e","#f59e0b","#ef4444"] }] 
+      }, 
+      options:{ responsive:true, maintainAspectRatio:false }
+    });
+
+    new Chart(document.getElementById("graficoUnidade"), {
+      type:"bar",
+      data:{ 
+        labels:Object.keys(unidadeCount), 
+        datasets:[{ label:"Por Unidade", data:Object.values(unidadeCount), backgroundColor:"#3b82f6" }] 
+      }, 
+      options:{ responsive:true, maintainAspectRatio:false }
+    });
+
+    new Chart(document.getElementById("graficoSetor"), {
+      type:"bar",
+      data:{ 
+        labels:Object.keys(setorCount), 
+        datasets:[{ label:"Por Setor", data:Object.values(setorCount), backgroundColor:"#a855f7" }] 
+      }, 
+      options:{ responsive:true, maintainAspectRatio:false }
+    });
+
+    // Gráfico de tempo em manutenção
+    let manutencaoDuracoes = [];
+    let manutencaoLabels = [];
+
+    itens.forEach((item, i) => {
+      if(item.status === "MANUTENCAO" && item.inicioManutencao){
+        const dias = Math.floor((Date.now() - new Date(item.inicioManutencao)) / (1000*60*60*24));
+        manutencaoDuracoes.push(dias);
+        manutencaoLabels.push(item.nome || ("Item " + (i+1)));
+      }
+    });
+
+    if(manutencaoDuracoes.length > 0){
+      new Chart(document.getElementById("graficoTempoManutencao"), {
+        type: "bar",
+        data: {
+          labels: manutencaoLabels,
+          datasets: [{
+            label: "Dias em manutenção",
+            data: manutencaoDuracoes,
+            backgroundColor: "#ef4444"
+          }]
+        },
+        options: { responsive:true, maintainAspectRatio:false }
+      });
+    }
+  } catch (err) {
+    alert(err.response?.data?.error || "Erro ao carregar dashboard");
+  }
+}
+carregarDashboard();
+</script>
+</body>
+</html>

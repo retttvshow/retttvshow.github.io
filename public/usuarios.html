@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Usuários cadastrados</title>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="menu">
+    <h2>Inventário</h2>
+    <a href="index.html">Dashboard</a>
+    <a href="inventario.html">Inventário</a>
+    <a href="historico.html">Histórico</a>
+    <hr>
+    <a href="cadastro.html">Cadastro de Usuário</a>
+    <a href="usuarios.html">Usuários cadastrados</a>
+  </div>
+  <div class="user-info">
+    <p id="usuarioLogado">Usuário: </p>
+    <button>Sair</button>
+  </div>
+</div>
+
+<div class="content">
+  <h1>Usuários cadastrados</h1>
+  <table id="tabelaUsuarios">
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Email</th>
+        <th>Unidade</th>
+        <th>Tipo de Conta</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody></tbody>
+  </table>
+</div>
+
+<!-- Modal Resetar Senha -->
+<div id="modalResetar" class="modal">
+  <div class="modal-content">
+    <h2>Resetar Senha</h2>
+    <input type="password" id="novaSenha" placeholder="Nova senha">
+    <input type="password" id="confirmarSenha" placeholder="Confirmar senha">
+    <button onclick="confirmarReset()">Confirmar</button>
+    <button onclick="fecharModal()">Cancelar</button>
+  </div>
+</div>
+
+<!-- Modal Editar Usuário -->
+<div id="modalEditar" class="modal">
+  <div class="modal-content">
+    <h2>Editar Usuário</h2>
+    <input type="text" id="editNome" placeholder="Nome">
+    <input type="text" id="editEmail" placeholder="Email">
+    <input type="text" id="editUnidade" placeholder="Unidade">
+    <select id="editRole">
+      <option value="COMUM">Comum</option>
+      <option value="ADMIN">Administrador</option>
+    </select>
+    <button onclick="confirmarEdicao()">Salvar</button>
+    <button onclick="fecharModalEditar()">Cancelar</button>
+  </div>
+</div>
+<script>
+  axios.defaults.headers.common["Authorization"] = "Bearer " + localStorage.getItem("token");
+
+let usuarios = [], usuarioSelecionado = null, usuarioEditando = null;
+
+async function carregarUsuarios(){
+  try {
+    const res = await axios.get("/usuarios", { headers: { Authorization: "Bearer " + localStorage.getItem("token") } });
+    usuarios = res.data;
+    const tbody = document.querySelector("#tabelaUsuarios tbody");
+    tbody.innerHTML = "";
+    usuarios.forEach(u => {
+      tbody.innerHTML += `<tr>
+        <td>${u.nome}</td>
+        <td>${u.email}</td>
+        <td>${u.unidade}</td>
+        <td>${u.role === 'ADMIN' ? 'Administrador' : 'Comum'}</td>
+        <td>
+          <button onclick="resetarSenha(${u.id})" class="btn-secondary">Resetar Senha</button>
+          <button onclick="excluirUsuario(${u.id})" class="btn-delete">Excluir</button>
+          <button onclick="editarUsuario(${u.id})" class="btn-edit">Editar</button>
+        </td>
+      </tr>`;
+    });
+  } catch(err){ alert("Erro ao carregar usuários"); }
+}
+
+function resetarSenha(id){ usuarioSelecionado = id; document.getElementById("modalResetar").style.display="flex"; }
+function fecharModal(){ document.getElementById("modalResetar").style.display="none"; usuarioSelecionado=null; }
+
+async function confirmarReset(){
+  const novaSenha = document.getElementById("novaSenha").value;
+  const confirmar = document.getElementById("confirmarSenha").value;
+  if(!novaSenha || !confirmar){ alert("Preencha os campos"); return; }
+  if(novaSenha !== confirmar){ alert("As senhas não conferem"); return; }
+  try {
+    await axios.put(`/usuarios/${usuarioSelecionado}/resetar-senha`, { senha: novaSenha }, { headers: { Authorization: "Bearer " + localStorage.getItem("token") } });
+    alert("Senha resetada com sucesso!"); fecharModal();
+  } catch(err){ alert("Erro ao resetar senha"); }
+}
+
+function editarUsuario(id){
+  usuarioEditando = id;
+  const usuario = usuarios.find(u => u.id === id);
+  if(usuario){
+    document.getElementById("editNome").value = usuario.nome;
+    document.getElementById("editEmail").value = usuario.email;
+    document.getElementById("editUnidade").value = usuario.unidade;
+    document.getElementById("editRole").value = usuario.role;
+  }
+  document.getElementById("modalEditar").style.display="flex";
+}
+function fecharModalEditar(){ document.getElementById("modalEditar").style.display="none"; usuarioEditando=null; }
+
+async function confirmarEdicao(){
+  const nome = document.getElementById("editNome").value;
+  const email = document.getElementById("editEmail").value;
+  const unidade = document.getElementById("editUnidade").value;
+  const role = document.getElementById("editRole").value;
+  try {
+    await axios.put(`/usuarios/${usuarioEditando}`, { nome, email, unidade, role }, { headers: { Authorization: "Bearer " + localStorage.getItem("token") } });
+    alert("Usuário atualizado com sucesso!"); fecharModalEditar(); carregarUsuarios();
+  } catch(err){ alert("Erro ao atualizar usuário"); }
+}
+
+async function excluirUsuario(id){
+  if(!confirm("Tem certeza que deseja excluir este usuário?")) return;
+  try {
+    await axios.delete(`/usuarios/${id}`, { headers: { Authorization: "Bearer " + localStorage.getItem("token") } });
+    alert("Usuário excluído com sucesso!"); carregarUsuarios();
+  } catch(err){ alert("Erro ao excluir usuário"); }
+}
+
+carregarUsuarios();
+</script>
+<script src="auth.js"></script>
+</body>
+</html>

@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Sistema Inventário - Histórico</title>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="menu">
+    <h2>Inventário</h2>
+    <a href="index.html">Dashboard</a>
+    <a href="inventario.html">Inventário</a>
+    <a href="historico.html">Histórico</a>
+    <hr>
+    <a href="cadastro.html">Cadastro de Usuário</a>
+    <a href="usuarios.html">Usuários cadastrados</a>
+  </div>
+  <div class="user-info">
+    <p id="usuarioLogado">Usuário: </p>
+    <button>Sair</button>
+  </div>
+</div>
+
+<div class="content">
+  <h1>Histórico</h1>
+  <div class="top-actions" style="flex-direction:row; justify-content:flex-start;">
+    <input id="buscaPatrimonio" placeholder="Digite Patrimônio ou Nº Série" style="width:250px;">
+    <button class="btn-primary" onclick="buscarHistorico()"><i class="fas fa-search"></i> Buscar Histórico</button>
+  </div>
+  <table class="tabela">
+    <thead><tr><th>Ação</th><th>Usuário</th><th>Campo</th><th>Valor Antigo</th><th>Valor Novo</th><th>Data/Hora</th></tr></thead>
+    <tbody id="tabelaHistorico"></tbody>
+  </table>
+</div>
+
+<script>
+  
+axios.defaults.headers.common["Authorization"] = "Bearer " + localStorage.getItem("token");
+async function buscarHistorico(){
+  const valor = document.getElementById("buscaPatrimonio").value.trim();
+  if(!valor){ 
+    alert("Digite um patrimônio ou número de série."); 
+    return; 
+  }
+  try {
+    const res = await axios.get("/historicos", { 
+      params: { patrimonio: valor, numeroSerie: valor },
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
+    });
+    const dados = res.data || [];
+    const tabela = document.getElementById("tabelaHistorico");
+    tabela.innerHTML = dados.length === 0 
+      ? `<tr><td colspan="6">Nenhum histórico encontrado.</td></tr>` 
+      : "";
+    dados.forEach(h => {
+  tabela.innerHTML += `<tr>
+    <td>${h.acao}</td>
+    <td>${h.usuarioRel?.nome || h.usuarioNome || "-"}</td>
+    <td>${h.campoAlterado || "-"}</td>
+    <td>${h.valorAntigo || "-"}</td>
+    <td>${h.valorNovo || "-"}</td>
+    <td>${h.dataHora ? new Date(h.dataHora).toLocaleString("pt-BR") : "-"}</td>
+  </tr>`;
+});
+
+  } catch(err){ 
+    console.error(err.response?.data);
+    alert(err.response?.data?.error || "Erro ao buscar histórico."); 
+  }
+}
+// dispara busca ao pressionar Enter
+document.getElementById("buscaPatrimonio").addEventListener("keypress", function(e) {
+  if (e.key === "Enter") {
+    buscarHistorico();
+  }
+});
+
+</script>
+<script src="auth.js"></script>
+</body>
+</html>

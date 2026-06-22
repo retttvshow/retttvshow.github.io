@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Cadastro de Usuários</title>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="menu">
+    <h2>Inventário</h2>
+    <a href="index.html">Dashboard</a>
+    <a href="inventario.html">Inventário</a>
+    <a href="historico.html">Histórico</a>
+    <hr>
+    <a href="cadastro.html">Cadastro de Usuário</a>
+    <a href="usuarios.html">Usuários cadastrados</a>
+  </div>
+  <div class="user-info">
+    <p id="usuarioLogado">Usuário: </p>
+    <button>Sair</button>
+  </div>
+</div>
+
+<div class="content">
+  <h1>Cadastro de Usuários</h1>
+  <div class="card">
+    <h2>Criar Conta</h2>
+    <input placeholder="Nome" id="nome">
+    <input placeholder="Email" id="email">
+    <!-- Campo de senha removido -->
+    <select id="role">
+      <option value="COMUM">Comum</option>
+      <option value="ADMIN">Admin</option>
+    </select>
+    <input placeholder="Unidade" id="unidade">
+    <button onclick="cadastrar()">Criar Conta</button>
+    <button onclick="abrirUsuarios()">Usuários cadastrados</button>
+  </div>
+</div>
+
+<script>
+  axios.defaults.headers.common["Authorization"] = "Bearer " + localStorage.getItem("token");
+
+async function cadastrar(){
+  const nome = document.getElementById("nome").value;
+  const email = document.getElementById("email").value;
+  const role = document.getElementById("role").value;
+  const unidade = document.getElementById("unidade").value;
+
+  if(!nome || !email || !unidade){
+    alert("Preencha todos os campos");
+    return;
+  }
+
+  try {
+    const res = await axios.post("/usuarios", { nome, email, role, unidade }, {
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") }
+    });
+
+    // agora mostra o link de ativação junto com a mensagem
+    alert("Conta criada com sucesso!\nLink de ativação: " + res.data.linkAtivacao);
+
+    // limpa os campos
+    document.getElementById("nome").value = "";
+    document.getElementById("email").value = "";
+    document.getElementById("role").value = "COMUM";
+    document.getElementById("unidade").value = "";
+  } catch(err){
+    alert(err.response?.data?.error || "Erro ao criar conta");
+  }
+}
+
+function abrirUsuarios(){ window.location.href = "usuarios.html"; }
+</script>
+<script src="auth.js"></script>
+</body>
+</html>

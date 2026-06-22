@@ -1,0 +1,65 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Item {
+  id            Int      @id @default(autoincrement())
+  nome          String
+  patrimonio    String
+  numeroSerie   String
+  unidade       String
+  status        String
+  usuarioCriador Int
+  responsavel   String
+  criadoEm      DateTime @default(now())
+  atualizadoEm  DateTime @updatedAt
+  inicioManutencao DateTime?
+  observacao    String? @db.VarChar(150)  
+  rfid 			String?
+  historicos    Historico[]
+}
+
+
+
+model Historico {
+  id            Int      @id @default(autoincrement())
+  acao          String
+  campoAlterado String?
+  valorAntigo   String?
+  valorNovo     String?
+  dataHora      DateTime @default(now())
+
+  // REGRA 1: Se o ITEM for excluído, apaga o histórico antigo dele (Cascade)
+  item          Item?    @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  itemId        Int?
+
+  // REGRA 2: Se o USUÁRIO for excluído, mantém o histórico, apenas tira o ID dele (SetNull)
+  usuarioRel    Usuario? @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+  usuarioId     Int?
+  
+  // Campo extra de segurança: Guarda o nome do utilizador em texto para o caso do utilizador ser apagado
+  usuarioNome   String? 
+}
+
+
+enum Role {
+  ADMIN
+  COMUM
+}
+
+model Usuario {
+  id       Int        @id @default(autoincrement())
+  nome     String
+  email    String     @unique
+  senha    String?
+  criadoEm DateTime   @default(now())
+  role     Role       @default(COMUM)   // agora é enum
+  unidade  String
+
+  historicos Historico[]   // relação inversa
+}

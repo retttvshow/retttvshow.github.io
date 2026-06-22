@@ -1,0 +1,3 @@
+-- AlterTable
+ALTER TABLE "Usuario" ALTER COLUMN "unidade" DROP NOT NULL,
+ALTER COLUMN "unidade" DROP DEFAULT;

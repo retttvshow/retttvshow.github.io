@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Login</title>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="card">
+  <h2>Login</h2>
+ <input id="email" type="text" placeholder="Email">
+<input id="senha" type="password" placeholder="Senha">
+<button onclick="login()">Entrar</button>
+
+<script>
+  axios.defaults.headers.common["Authorization"] = "Bearer " + localStorage.getItem("token");
+
+async function login(){
+  const email = document.getElementById("email").value;
+  const senha = document.getElementById("senha").value;
+  if(!email || !senha){ alert("Preencha todos os campos"); return; }
+  try {
+    const res = await axios.post("/auth/login", { email, senha });
+    localStorage.setItem("token", res.data.token);
+    localStorage.setItem("usuarioRole", res.data.role);
+    localStorage.setItem("usuarioNome", res.data.nome || email);
+    window.location.href = "index.html";
+  } catch(err){ 
+    alert(err.response?.data?.error || "Erro ao fazer login"); 
+  }
+}
+
+// 🔑 Captura Enter no campo de senha
+document.getElementById("senha").addEventListener("keypress", function(e) {
+  if (e.key === "Enter") {
+    login(); // chama a função correta
+  }
+});
+</script>
+
+</body>
+</html>

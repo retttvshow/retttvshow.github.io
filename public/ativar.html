@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Ativação de Conta</title>
+  <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="content">
+  <h1>Ativação de Conta</h1>
+  <div class="card">
+    <h2>Defina sua senha</h2>
+    <form id="formAtivacao">
+      <input type="password" id="senha" placeholder="Digite sua nova senha" required>
+      <button type="submit">Definir senha</button>
+    </form>
+  </div>
+</div>
+
+<script>
+    
+document.getElementById("formAtivacao").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const senha = document.getElementById("senha").value;
+
+  // pega o id da URL (ex: /ativar/5)
+  const userId = window.location.pathname.split("/").pop();
+
+  try {
+    await axios.post(`/usuarios/${userId}/definir-senha`, { senha });
+    alert("Senha definida com sucesso! Agora você pode fazer login.");
+    window.location.href = "/login.html";
+  } catch(err){
+    alert(err.response?.data?.error || "Erro ao definir senha");
+  }
+});
+</script>
+
+</body>
+</html>

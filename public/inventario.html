@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Sistema Inventário - Inventário</title>
+<script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+<link rel="stylesheet" href="style.css">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+
+<div class="sidebar">
+  <div class="menu">
+    <h2>Inventário</h2>
+    <a href="index.html">Dashboard</a>
+    <a href="inventario.html">Inventário</a>
+    <a href="historico.html">Histórico</a>
+    <hr>
+    <a href="cadastro.html">Cadastro de Usuário</a>
+    <a href="usuarios.html">Usuários cadastrados</a>
+  </div>
+  <div class="user-info">
+    <p id="usuarioLogado">Usuário: </p>
+    <button onclick="logout()">Sair</button>
+  </div>
+</div>
+
+<div class="content">
+  <h1>Inventário</h1>
+
+  <!-- Botões superiores -->
+  <div class="top-actions" style="display:flex; gap:10px; justify-content:flex-end;">
+    <button class="btn-primary" onclick="abrirModalCadastro()"><i class="fas fa-plus-circle"></i> Novo Item</button>
+    <button class="btn-secondary" onclick="abrirModalFiltro()"><i class="fas fa-filter"></i> Filtrar Itens</button>
+    <button class="btn-secondary" onclick="limparFiltro()"><i class="fas fa-eraser"></i> Limpar Filtro</button>
+  </div>
+
+  <!-- Tabela -->
+  <table class="tabela">
+    <thead>
+      <tr>
+        <th>Nome</th>
+        <th>Patrimônio</th>
+        <th>Série</th>
+        <th>RFID</th>
+        <th>Unidade</th>
+        <th>Responsável</th>
+        <th>Status</th>
+        <th>Ações</th>
+      </tr>
+    </thead>
+    <tbody id="tabela"></tbody>
+  </table>
+
+  <!-- Paginação -->
+  <div class="pagination">
+    <button onclick="paginaAnterior()" class="btn-secondary"><i class="fas fa-arrow-left"></i> Anterior</button>
+    <span id="paginaInfo"></span>
+    <button onclick="proximaPagina()" class="btn-secondary">Próxima <i class="fas fa-arrow-right"></i></button>
+    <select id="limitSelect" onchange="alterarLimite()">
+      <option value="20">20 por página</option>
+      <option value="50">50 por página</option>
+      <option value="100">100 por página</option>
+    </select>
+  </div>
+</div>
+
+<!-- Modal Cadastro -->
+<div id="modalCadastro" class="modal">
+  <div class="modal-content">
+    <h3><i class="fas fa-plus-circle"></i> Novo Item</h3>
+    <input placeholder="Nome" id="nome">
+    <input placeholder="Patrimônio" id="patrimonio">
+    <input placeholder="Número Série" id="numeroSerie">
+    <input id="rfid" placeholder="RFID">
+    <input placeholder="Unidade" id="unidade">
+    <input placeholder="Responsável" id="responsavel">
+    <select id="status">
+      <option value="ATIVO">Ativo</option>
+      <option value="ESTOQUE">Estoque</option>
+      <option value="MANUTENCAO">Manutenção</option>
+    </select>
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="cadastrar()"><i class="fas fa-save"></i> Salvar</button>
+      <button class="btn-secondary" onclick="fecharModalCadastro()"><i class="fas fa-times"></i> Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal Filtro -->
+<div id="modalFiltro" class="modal">
+  <div class="modal-content">
+    <h3><i class="fas fa-filter"></i> Filtrar Itens</h3>
+    <input placeholder="Patrimônio" id="filtroPatrimonio">
+    <input placeholder="Número Série" id="filtroNumeroSerie">
+    <input placeholder="Unidade" id="filtroUnidade">
+    <input placeholder="Responsável" id="filtroResponsavel">
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="carregar()"><i class="fas fa-search"></i> Aplicar</button>
+      <button class="btn-secondary" onclick="fecharModalFiltro()"><i class="fas fa-times"></i> Fechar</button>
+    </div>
+  </div>
+</div>
+<!-- Modal Editar -->
+<div id="modalEditar" class="modal">
+  <div class="modal-content">
+    <h3><i class="fas fa-edit"></i> Editar Item</h3>
+    <input id="editNome" placeholder="Nome">
+    <input id="editPatrimonio" placeholder="Patrimônio">
+    <input id="editNumeroSerie" placeholder="Número Série">
+    <input id="editRfid" placeholder="RFID">
+    <input id="editUnidade" placeholder="Unidade">
+    <select id="editStatus">
+      <option value="ATIVO">Ativo</option>
+      <option value="ESTOQUE">Estoque</option>
+      <option value="MANUTENCAO">Manutenção</option>
+    </select>
+    
+    <input id="infoOldObservacao" readonly style="display: none; background-color: #eee; color: #555; border: 1px dashed #999;" title="Motivo pelo qual entrou em manutenção">
+    
+    <input id="editObservacao" placeholder="Observação de Manutenção (Máx 150 caracteres)" maxlength="150" style="display: none;">
+    <div class="modal-actions">
+      <button class="btn-primary" onclick="salvarEdicao()"><i class="fas fa-save"></i> Salvar</button>
+      <button class="btn-secondary" onclick="fecharModalEditar()"><i class="fas fa-times"></i> Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  axios.defaults.headers.common["Authorization"] = "Bearer " + localStorage.getItem("token");
+
+let paginaAtual = 1, limite = 20, totalRegistros = 0;
+let itemEditando = null, itensCache = [];
+
+axios.defaults.headers.common["Authorization"] = "Bearer " + localStorage.getItem("token");
+
+async function carregar(){
+  const patrimonio = document.getElementById("filtroPatrimonio")?.value || "";
+  const numeroSerie = document.getElementById("filtroNumeroSerie")?.value || "";
+  const unidade = document.getElementById("filtroUnidade")?.value || "";
+  const responsavel = document.getElementById("filtroResponsavel")?.value || "";
+
+  const res = await axios.get(`/itens`,{ params:{ page: paginaAtual, limit: limite, patrimonio, numeroSerie, unidade, responsavel } });
+  itensCache = res.data; // backend retorna lista simples
+  totalRegistros = itensCache.length; // ajuste simples
+  const tabela = document.getElementById("tabela"); 
+  tabela.innerHTML="";
+  
+  if(itensCache.length > 0){
+    itensCache.forEach(p=>{
+      tabela.innerHTML+=`<tr>
+        <td>${p.nome}</td>
+        <td>${p.patrimonio || "-"}</td>
+        <td>${p.rfid || "-"}</td> <td>${p.numeroSerie || "-"}</td>
+        <td>${p.unidade || "-"}</td>
+        <td>${p.responsavel || "-"}</td>
+        <td>${formatarStatus(p.status)}</td>
+        <td>
+          <button class="btn-edit" onclick="abrirModalEditar(${p.id})"><i class="fas fa-edit"></i></button>
+          <button class="btn-delete" onclick="excluir(${p.id})"><i class="fas fa-trash"></i></button>
+        </td></tr>`;
+    });
+    fecharModalFiltro();
+  } else { 
+    alert("Nenhum item encontrado."); 
+  }
+  document.getElementById("paginaInfo").innerText = `Página ${paginaAtual}`;
+}
+function formatarStatus(status){ return status==="ATIVO"?"Ativo":status==="ESTOQUE"?"Estoque":status==="MANUTENCAO"?"Manutenção":status; }
+function proximaPagina(){ paginaAtual++; carregar(); }
+function paginaAnterior(){ if(paginaAtual > 1){ paginaAtual--; carregar(); } }
+function alterarLimite(){ limite = parseInt(document.getElementById("limitSelect").value); paginaAtual = 1; carregar(); }
+
+async function cadastrar(){
+  const nome = document.getElementById("nome").value;
+  const patrimonio = document.getElementById("patrimonio").value;
+  const numeroSerie = document.getElementById("numeroSerie").value;
+  const rfid = document.getElementById("rfid").value;
+  const unidade = document.getElementById("unidade").value;
+  const responsavel = document.getElementById("responsavel").value;
+  const status = document.getElementById("status").value;
+
+  try {
+    await axios.post("/itens",
+      { nome, patrimonio, numeroSerie, rfid, unidade, responsavel, status },
+      { headers: { Authorization: "Bearer " + localStorage.getItem("token") } }
+    );
+    fecharModalCadastro();
+    carregar();
+    alert("Item cadastrado com sucesso!");
+  } catch(err){
+    console.error(err.response?.data);
+    alert(err.response?.data?.error || "Erro ao cadastrar");
+  }
+}
+
+async function excluir(id){ 
+  if(localStorage.getItem("usuarioRole") !== "ADMIN"){
+    alert("Apenas administradores podem excluir itens");
+    return;
+  }
+  if(confirm("Deseja realmente excluir este item?")){
+    try {
+      await axios.delete(`/itens/${id}`, { headers: { Authorization: "Bearer " + localStorage.getItem("token") } });
+      carregar();
+    } catch(err){ alert(err.response?.data?.error || "Erro ao excluir item"); }
+  }
+}
+
+function abrirModalEditar(id){
+  itemEditando = id;
+  const p = itensCache.find(x => x.id === id);
+  if(!p){ alert("Item não encontrado"); return; }
+  
+  document.getElementById("editNome").value = p.nome;
+  document.getElementById("editPatrimonio").value = p.patrimonio || "";
+  document.getElementById("editNumeroSerie").value = p.numeroSerie || "";
+  document.getElementById("editRfid").value = p.rfid || "";
+  document.getElementById("editUnidade").value = p.unidade || "";
+  document.getElementById("editStatus").value = p.status;
+  
+  const obsInput = document.getElementById("editObservacao");
+  const oldObsInput = document.getElementById("infoOldObservacao"); // O campo cinza
+  
+  // Reseta os campos para não herdar de cliques anteriores
+  oldObsInput.style.display = "none";
+  oldObsInput.value = "";
+  
+  if (p.status === "MANUTENCAO") {
+    obsInput.style.display = "block";
+    obsInput.value = p.observacao || ""; 
+    obsInput.placeholder = "Observação atual";
+  } else {
+    obsInput.style.display = "none";
+    obsInput.value = "";
+  }
+  
+  document.getElementById("modalEditar").style.display="flex";
+}
+function fecharModalEditar(){ document.getElementById("modalEditar").style.display="none"; itemEditando=null; }
+
+async function salvarEdicao(){
+  if(!itemEditando) return;
+  
+  const nome = document.getElementById("editNome").value;
+  const patrimonio = document.getElementById("editPatrimonio").value;
+  const numeroSerie = document.getElementById("editNumeroSerie").value;
+  const unidade = document.getElementById("editUnidade").value;
+  const status = document.getElementById("editStatus").value; // NOVO status selecionado
+  const rfid = document.getElementById("editRfid").value;
+  const observacao = document.getElementById("editObservacao").value;
+  
+  // --- NOVA TRAVA DE SEGURANÇA (OBRIGATÓRIO) ---
+  const itemOriginal = itensCache.find(x => x.id === itemEditando);
+  const statusOriginal = itemOriginal ? itemOriginal.status : "";
+
+  // 1. Se está ENTRANDO em manutenção
+  if (status === "MANUTENCAO" && statusOriginal !== "MANUTENCAO" && observacao.trim() === "") {
+    alert("Atenção: É obrigatório informar o DEFEITO/MOTIVO para enviar o item à manutenção.");
+    return; // Interrompe e não salva
+  }
+
+  // 2. Se está SAINDO da manutenção
+  if (statusOriginal === "MANUTENCAO" && status !== "MANUTENCAO" && observacao.trim() === "") {
+    alert("Atenção: É obrigatório informar o LAUDO (o que foi consertado) antes de retirar da manutenção.");
+    return; // Interrompe e não salva
+  }
+  // --------------------------------------------
+
+  try {
+    await axios.put(`/itens/${itemEditando}`, { 
+      nome, patrimonio, numeroSerie, rfid, unidade, status, observacao 
+    }, { 
+      headers: { Authorization: "Bearer " + localStorage.getItem("token") } 
+    });
+    
+    fecharModalEditar(); 
+    carregar(); 
+    alert("Item atualizado com sucesso!");
+  } catch(err){ 
+    alert(err.response?.data?.error || "Erro ao salvar edição"); 
+  }
+}
+
+/* Controle dos modais */
+function abrirModalCadastro(){ document.getElementById("modalCadastro").style.display="flex"; }
+function fecharModalCadastro(){ document.getElementById("modalCadastro").style.display="none"; }
+function abrirModalFiltro(){ document.getElementById("modalFiltro").style.display="flex"; }
+function fecharModalFiltro(){ document.getElementById("modalFiltro").style.display="none"; }
+function limparFiltro(){ document.getElementById("filtroPatrimonio").value=""; document.getElementById("filtroNumeroSerie").value=""; document.getElementById("filtroUnidade").value=""; document.getElementById("filtroResponsavel").value=""; carregar(); }
+
+carregar();
+
+/* Ajustes de Enter */
+document.querySelectorAll("#modalCadastro input, #modalCadastro select").forEach((input, index, arr) => {
+  input.addEventListener("keypress", e => { if(e.key==="Enter"){ e.preventDefault(); const next=arr[index+1]; next?next.focus():cadastrar(); } });
+});
+document.querySelectorAll("#modalFiltro input").forEach(input => {
+  input.addEventListener("keypress", e => { if(e.key==="Enter"){ e.preventDefault(); carregar(); } });
+});
+document.querySelectorAll("#modalEditar input, #modalEditar select").forEach((input, index, arr) => {
+  input.addEventListener("keypress", e => { if(e.key==="Enter"){ e.preventDefault(); const next=arr[index+1]; next?next.focus():salvarEdicao(); } });
+});
+// Lógica para mostrar/esconder campos e exibir a observação antiga
+document.getElementById("editStatus").addEventListener("change", function(e) {
+  if(!itemEditando) return;
+  const itemOriginal = itensCache.find(x => x.id === itemEditando);
+  const statusOriginal = itemOriginal ? itemOriginal.status : "";
+  const novoStatus = e.target.value;
+
+  const obsInput = document.getElementById("editObservacao");
+  const oldObsInput = document.getElementById("infoOldObservacao");
+
+  if (statusOriginal === "MANUTENCAO" && novoStatus !== "MANUTENCAO") {
+    // CENÁRIO 1: Tirando da Manutenção
+    oldObsInput.style.display = "block";
+    oldObsInput.value = "Defeito relatado: " + (itemOriginal.observacao || "Não informado");
+    
+    obsInput.style.display = "block";
+    obsInput.placeholder = "Obrigatório: O que foi feito? (Laudo)";
+    obsInput.value = ""; // Limpa para forçar o usuário a digitar a nova!
+  } 
+  else if (statusOriginal !== "MANUTENCAO" && novoStatus === "MANUTENCAO") {
+    // CENÁRIO 2: Colocando na Manutenção
+    oldObsInput.style.display = "none";
+    
+    obsInput.style.display = "block";
+    obsInput.placeholder = "Obrigatório: Qual o defeito? (Motivo)";
+    obsInput.value = "";
+  } 
+  else if (statusOriginal === "MANUTENCAO" && novoStatus === "MANUTENCAO") {
+    // CENÁRIO 3: Já estava em manutenção, apenas abriu pra olhar
+    oldObsInput.style.display = "none";
+    
+    obsInput.style.display = "block";
+    obsInput.placeholder = "Observação de Manutenção";
+    obsInput.value = itemOriginal.observacao || "";
+  } 
+  else {
+    // CENÁRIO 4: Movendo de Ativo para Estoque, etc.
+    oldObsInput.style.display = "none";
+    obsInput.style.display = "none";
+    obsInput.value = "";
+  }
+});
+</script>
+<script src="auth.js"></script>
+</body>
+</html>
